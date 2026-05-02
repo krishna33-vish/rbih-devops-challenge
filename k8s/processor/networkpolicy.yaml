@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-processor-netpol
+  namespace: payments
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-processor
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # ONLY accept traffic from the payment-gateway — nothing else
+    - from:
+        - podSelector:
+            matchLabels:
+              app: payment-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow DNS resolution (required for service discovery)
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

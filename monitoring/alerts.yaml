@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-platform-alerts
+  namespace: payments
+  labels:
+    # This label is required for the Prometheus Operator to pick up this rule
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: payment-platform
+      interval: 30s
+      rules:
+
+        # ── Availability ──────────────────────────────────────────────────────
+
+        - alert: PaymentGatewayDown
+          expr: up{job="payment-gateway"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Payment gateway is down"
+            description: "payment-gateway has been unreachable for more than 1 minute. Users cannot submit payments."
+            runbook: "https://wiki.example.com/runbooks/payment-gateway-down"
+
+        - alert: PaymentProcessorDown
+          expr: up{job="payment-processor"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Payment processor is down"
+            description: "payment-processor has been unreachable for more than 1 minute. All payments will fail."
+            runbook: "https://wiki.example.com/runbooks/payment-processor-down"
+
+        # ── Error rates ───────────────────────────────────────────────────────
+
+        - alert: HighGatewayErrorRate
+          expr: |
+            rate(gateway_requests_total{status="error"}[5m])
+            /
+            rate(gateway_requests_total[5m]) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Gateway error rate above 5%"
+            description: "More than 5% of payment requests are failing at the gateway. Current rate: {{ $value | humanizePercentage }}."
+            runbook: "https://wiki.example.com/runbooks/gateway-high-error-rate"
+
+        - alert: ProcessorConnectionErrors
+          expr: rate(gateway_processor_errors_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Gateway is having trouble reaching the processor"
+            description: "Connection errors to payment-processor detected. Error type: {{ $labels.error_type }}."
+            runbook: "https://wiki.example.com/runbooks/processor-connection-errors"
+
+        # ── Latency ───────────────────────────────────────────────────────────
+
+        - alert: HighGatewayLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(gateway_request_duration_seconds_bucket[5m])
+            ) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Gateway p95 latency above 3s"
+            description: "95th percentile response time is {{ $value | humanizeDuration }}. SLA breach risk."
+            runbook: "https://wiki.example.com/runbooks/gateway-high-latency"
+
+        # ── Pod health ────────────────────────────────────────────────────────
+
+        - alert: PaymentPodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{
+              namespace="payments"
+            }[15m]) > 3
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash-looping"
+            description: "Pod {{ $labels.pod }} in namespace payments has restarted more than 3 times in 15 minutes."
+            runbook: "https://wiki.example.com/runbooks/pod-crash-loop"

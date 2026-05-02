@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-processor
+  namespace: payments
+  labels:
+    app: payment-processor
+spec:
+  # ClusterIP means only reachable inside the cluster — not exposed externally
+  type: ClusterIP
+  selector:
+    app: payment-processor
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
