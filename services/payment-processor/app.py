@@ -92,8 +92,10 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/process", response_model=PaymentResponse)
-def process_payment(payment: PaymentRequest):
+def process_payment(payment: PaymentRequest, request: Request):
     start = time.time()
+    # Read trace_id from header that gateway sent
+    trace_id = request.headers.get("X-Trace-Id", "unknown")
     logger.info(json.dumps({
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "level": "INFO",
@@ -105,6 +107,7 @@ def process_payment(payment: PaymentRequest):
         "merchant_id": payment.merchant_id,
         # Never log full card data — only last four is already safe
         "card_last_four": payment.card_last_four,
+        "trace_id": trace_id,
     }))
 
     # Simulate processing logic
